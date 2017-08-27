@@ -30,8 +30,8 @@ typedef struct distmutex_s distmutex_t;
 
 distmutex_t *dist_mutex_init(const redisContext **ctx, size_t count, size_t vallen);
 void dist_mutex_destroy(distmutex_t *mutex);
-int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout);
-int dist_mutex_trylock(distmutex_t *mutex, const char *key, int timeout, int retries);
+int dist_mutex_lock(distmutex_t *mutex, const char *key, int expiretime);
+int dist_mutex_trylock(distmutex_t *mutex, const char *key, int expiretime, int retries);
 int dist_mutex_unlock(distmutex_t *mutex, const char *key);
 int dist_mutex_status(distmutex_t *mutex);
 
