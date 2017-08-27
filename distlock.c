@@ -140,15 +140,15 @@ static inline int __check_params(distmutex_t *mutex, const char *key, int status
     return MUTEX_OK;
 }
 
-int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout)
+int dist_mutex_lock(distmutex_t *mutex, const char *key, int expiretime)
 {
     int iret = MUTEX_OK;
     if ( (iret = __check_params(mutex, key, MUTEX_STATUS_FREE)) != MUTEX_OK) {
         return iret;
     }
 
-    if (timeout <= 0) {
-        timeout = 60000;
+    if (expiretime <= 0) {
+        expiretime = 60000;
     }
 
     // 1. It gets the current time in milliseconds.
@@ -163,7 +163,7 @@ int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout)
     __get_random_value(mutex);
 
     int length = snprintf(command, sizeof(command), "set %s %s nx px %d",
-            key, mutex->vbuffer, timeout);
+            key, mutex->vbuffer, expiretime);
     command[length] = '\0';
 
     mutex->lockcount = 0;
@@ -207,15 +207,15 @@ int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout)
      * 4. If the lock was acquired, its validity time is considered to be the initial
      * validity time minus the time elapsed, as computed in step 3.
      */
-    int64_t expiretime = timeout - (currtime - starttime);
-    if (expiretime <= 0 || currtime < starttime || mutex->lockcount < mutex->quorum) {
+    int64_t expiretmp = expiretime - (currtime - starttime);
+    if (expiretmp <= 0 || currtime < starttime || mutex->lockcount < mutex->quorum) {
         /*
          * 5. If the client failed to acquire the lock for some reason (either it was not
          * able to lock N/2+1 instances or the validity time is negative), it will try
          * to unlock all the instances (even the instances it believed it was not able to lock).
          */
         dist_mutex_unlock(mutex, key);
-        if (expiretime <= 0 || currtime < starttime) {
+        if (expiretmp <= 0 || currtime < starttime) {
             return -ERR_LOCK_TIMEOUT;
         } else {
             return -ERR_QUORUM_FAILED;
@@ -223,10 +223,10 @@ int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout)
     }
 
 #if 0
-    if (timeout > 10000 && (timeout - expiretime) > 1000) {
+    if (expiretime > 10000 && (timeout - expiretime) > 1000) {
         length = snprintf(command, sizeof(command), "if redis.call('get', '%s') == '%s' then "
                 "return redis.call('set', '%s', '%s', 'xx', 'px', '%ld') else return 0 end",
-                key, mutex->vbuffer, key, mutex->vbuffer, expiretime);
+                key, mutex->vbuffer, key, mutex->vbuffer, expiretmp);
         command[length] = '\0';
         //static char *chgexpire_script = (char *) "if redis.call('get', KEYS[1]) == ARGV[1] then "
         //        "return redis.call('set', KEYS[1], ARGV[1], 'xx', 'px', ARGV[2]) else return 0 end";
@@ -243,7 +243,7 @@ int dist_mutex_lock(distmutex_t *mutex, const char *key, int timeout)
     return iret;
 }
 
-int dist_mutex_trylock(distmutex_t *mutex, const char *key, int timeout, int retries)
+int dist_mutex_trylock(distmutex_t *mutex, const char *key, int expiretime, int retries)
 {
     int iret = MUTEX_OK;
     if ( (iret == __check_params(mutex, key, MUTEX_STATUS_FREE)) != MUTEX_OK) {
@@ -257,7 +257,7 @@ int dist_mutex_trylock(distmutex_t *mutex, const char *key, int timeout, int ret
     int i = 0;
 
     for (i = 0; i < retries; i++) {
-        if (dist_mutex_lock(mutex, key, timeout) == MUTEX_OK) {
+        if (dist_mutex_lock(mutex, key, expiretime) == MUTEX_OK) {
             return MUTEX_OK;
         }
     }
