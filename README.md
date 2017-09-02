@@ -1,7 +1,7 @@
 # distlock for c implemented by redis
 
 ------
-Based on redis ![redlock](https://redis.io/topics/distlock)
+Based on redis [redlock](https://redis.io/topics/distlock)
 
 
 ## To create an lock manager
